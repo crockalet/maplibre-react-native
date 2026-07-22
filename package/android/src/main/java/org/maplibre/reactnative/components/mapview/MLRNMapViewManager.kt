@@ -78,7 +78,12 @@ open class MLRNMapViewManager(
             mViews.remove(reactTag)
         }
 
-        mapView.dispose()
+        // Disposing synchronously can free MapLibre's RunLoop while its Looper FD is already
+        // signalled, so the next poll invokes a callback against a freed actor (SIGSEGV in
+        // libmaplibre.so). dispose() is @Synchronized and guarded, so a repeat call is a no-op.
+        UiThreadUtil.runOnUiThread {
+            mapView.dispose()
+        }
 
         super.onDropViewInstance(mapView)
     }
