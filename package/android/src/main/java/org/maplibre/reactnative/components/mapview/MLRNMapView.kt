@@ -351,7 +351,12 @@ open class MLRNMapView(
             it.annotationId == annotationId
         }
 
-    fun getSymbolManager(): SymbolManager = symbolManager!!
+    fun getSymbolManager(): SymbolManager {
+        if (symbolManager == null) {
+            mapLibreMap?.style?.let { createSymbolManager(it) }
+        }
+        return symbolManager!!
+    }
 
     interface FoundLayerCallback {
         fun found(layer: Layer?)
@@ -463,8 +468,16 @@ open class MLRNMapView(
 
         reflow()
 
+        // Registered up front so onPress/onLongPress work without a PointAnnotation. The
+        // SymbolManager — whose MapClickResolver runs a synchronous queryRenderedFeatures on
+        // every tap — is created lazily by getSymbolManager on the first PointAnnotation.
+        mapLibreMap.addOnMapClickListener(this)
+        mapLibreMap.addOnMapLongClickListener(this)
+
         mapLibreMap.getStyle { style ->
-            createSymbolManager(style)
+            if (symbolManager != null) {
+                createSymbolManager(style)
+            }
             setUpImage(style)
             addQueuedFeatures()
         }
@@ -538,6 +551,10 @@ open class MLRNMapView(
                 }
             },
         )
+        // SymbolManager just registered the plugin's MapClickResolver; re-register ours after
+        // it so PointAnnotation hit-testing keeps priority over the generic onPress dispatch.
+        mapLibreMap!!.removeOnMapClickListener(this)
+        mapLibreMap!!.removeOnMapLongClickListener(this)
         mapLibreMap!!.addOnMapClickListener(this)
         mapLibreMap!!.addOnMapLongClickListener(this)
     }
